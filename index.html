@@ -601,6 +601,16 @@
         font-size: 0.9rem;
       }
     }
+
+    /* LIVE NEWS, VACANCIES & EVENTS */
+    .live-post-image { width:100%; height:220px; object-fit:cover; display:block; }
+    .live-post-links { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+    .live-post-links a { margin:0; }
+    .post-filter-wrap { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin:0 0 30px; }
+    .post-filter { border:1px solid #d8dee9; background:#fff; color:#0b2861; padding:10px 18px; border-radius:24px; cursor:pointer; font-weight:700; }
+    .post-filter.active,.post-filter:hover { background:#0b2861; color:#fff; }
+    .posts-status { grid-column:1/-1; text-align:center; padding:30px; }
+
   </style>
 </head>
 
@@ -830,115 +840,23 @@
       </div>
     </section>
 
-   <!-- NEWS AND VACANCIES -->
+   <!-- LIVE NEWS, VACANCIES AND EVENTS -->
 <section id="news" class="section tinted">
   <div class="container">
-
     <div class="center-head">
-      <p class="section-tag">NEWS & VACANCIES</p>
-
-      <h2>Latest News & Opportunities</h2>
-
-      <p>
-        Stay updated with the latest announcements, school events,
-        achievements and career opportunities at Ndima Kanini Academy.
-      </p>
+      <p class="section-tag">LATEST UPDATES</p>
+      <h2>News, Vacancies & Events</h2>
+      <p>Stay updated with the latest announcements, school events, achievements and career opportunities at Ndima Kanini Academy.</p>
     </div>
-
-    <div class="news-grid">
-
-      <!-- VACANCY 1 -->
-      <article class="news-card vacancy">
-
-        <div class="news-badge">
-          VACANCY
-        </div>
-
-        <p class="news-date">
-          Posted: August 2026
-        </p>
-
-        <h3>
-          Teaching Vacancies
-        </h3>
-
-        <p>
-          Ndima Kanini Academy invites qualified, passionate
-          and dedicated teachers to apply for available
-          teaching positions.
-        </p>
-
-        <p>
-          <strong>Application Deadline:</strong>
-          To be announced
-        </p>
-
-        <a
-          href="mailto:ndimakaniniacademy@gmail.com?subject=Teaching Application"
-          class="btn primary">
-
-          Apply Now
-
-        </a>
-
-      </article>
-
-
-      <!-- SCHOOL NEWS -->
-      <article class="news-card">
-
-        <div class="news-badge blue">
-          SCHOOL NEWS
-        </div>
-
-        <p class="news-date">
-          Latest Update
-        </p>
-
-        <h3>
-          Academic Excellence & Student Achievement
-        </h3>
-
-        <p>
-          Celebrating the hard work, commitment and achievements
-          of our learners and teachers.
-        </p>
-
-        <a href="#contact" class="text-link">
-          Learn More →
-        </a>
-
-      </article>
-
-
-      <!-- UPCOMING EVENT -->
-      <article class="news-card">
-
-        <div class="news-badge purple">
-          UPCOMING EVENT
-        </div>
-
-        <p class="news-date">
-          School Calendar
-        </p>
-
-        <h3>
-          School Events & Activities
-        </h3>
-
-        <p>
-          Follow our upcoming educational activities,
-          competitions, trips and special school programmes.
-        </p>
-
-        <a href="#contact" class="text-link">
-          Learn More →
-        </a>
-
-      </article>
-
+    <div class="post-filter-wrap">
+      <button class="post-filter active" data-filter="all">All Updates</button>
+      <button class="post-filter" data-filter="news">News</button>
+      <button class="post-filter" data-filter="vacancy">Vacancies</button>
+      <button class="post-filter" data-filter="event">Events</button>
     </div>
-
+    <div class="news-grid" id="schoolPosts">
+      <p class="posts-status">Loading latest updates...</p>
+    </div>
   </div>
 </section>
 
@@ -1116,6 +1034,81 @@
       document.getElementById("form-status").textContent =
         "Opening your email application...";
     }
+
+    // LIVE NEWS, VACANCIES & EVENTS
+    // Change this to your deployed backend URL before publishing online.
+    const API_URL = "http://localhost:3000";
+    let allSchoolPosts = [];
+    let currentPostFilter = "all";
+
+    async function loadSchoolPosts() {
+      const container = document.getElementById("schoolPosts");
+      try {
+        const response = await fetch(`${API_URL}/api/posts`);
+        if (!response.ok) throw new Error("Could not load updates.");
+        allSchoolPosts = await response.json();
+        renderSchoolPosts();
+      } catch (error) {
+        console.error(error);
+        container.innerHTML = '<p class="posts-status">Updates are currently unavailable. Please check again later.</p>';
+      }
+    }
+
+    function escapeSchoolHTML(value) {
+      const div = document.createElement("div");
+      div.textContent = value || "";
+      return div.innerHTML;
+    }
+
+    function formatSchoolDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return escapeSchoolHTML(value);
+      return date.toLocaleDateString("en-GB", {day:"numeric", month:"long", year:"numeric"});
+    }
+
+    function renderSchoolPosts() {
+      const container = document.getElementById("schoolPosts");
+      const filtered = currentPostFilter === "all"
+        ? allSchoolPosts
+        : allSchoolPosts.filter(post => post.type === currentPostFilter);
+
+      if (!filtered.length) {
+        container.innerHTML = '<p class="posts-status">No updates are available in this category yet.</p>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(post => {
+        const label = post.type === "vacancy" ? "VACANCY" : post.type === "event" ? "UPCOMING EVENT" : "SCHOOL NEWS";
+        const badgeClass = post.type === "vacancy" ? "" : post.type === "event" ? "purple" : "blue";
+        const image = post.photo ? `<img class="live-post-image" src="${API_URL}${post.photo}" alt="${escapeSchoolHTML(post.title)}">` : "";
+        const deadline = post.type === "vacancy" && post.deadline ? `<p><strong>Application Deadline:</strong> ${formatSchoolDate(post.deadline)}</p>` : "";
+        const eventDate = post.type === "event" && post.eventDate ? `<p><strong>Event Date:</strong> ${formatSchoolDate(post.eventDate)}</p>` : "";
+        const file = post.file ? `<a href="${API_URL}${post.file}" target="_blank" rel="noopener" class="btn primary">View Advert</a>` : "";
+        const apply = post.type === "vacancy" && post.email ? `<a href="mailto:${escapeSchoolHTML(post.email)}?subject=${encodeURIComponent("Application: " + (post.title || ""))}" class="btn primary">Apply Now</a>` : "";
+        return `<article class="news-card ${post.type === "vacancy" ? "vacancy" : ""}">
+          ${image}
+          <div class="news-badge ${badgeClass}">${label}</div>
+          <p class="news-date">Posted: ${formatSchoolDate(post.createdAt)}</p>
+          <h3>${escapeSchoolHTML(post.title)}</h3>
+          <p>${escapeSchoolHTML(post.description)}</p>
+          ${deadline}${eventDate}
+          <div class="live-post-links">${file}${apply}</div>
+        </article>`;
+      }).join("");
+    }
+
+    document.querySelectorAll(".post-filter").forEach(button => {
+      button.addEventListener("click", function() {
+        document.querySelectorAll(".post-filter").forEach(btn => btn.classList.remove("active"));
+        this.classList.add("active");
+        currentPostFilter = this.dataset.filter;
+        renderSchoolPosts();
+      });
+    });
+
+    loadSchoolPosts();
+
   </script>
 
 </body>
