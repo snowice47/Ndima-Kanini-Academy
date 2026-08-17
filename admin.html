@@ -1071,8 +1071,8 @@
       try {
 
         const response =
-          await fetch(
-            `${API_URL}/api/posts`,
+          await apiFetch(
+            `/api/posts`,
             {
               method: "POST",
               body: formData
