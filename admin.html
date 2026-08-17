@@ -457,6 +457,9 @@
         <button onclick="showPage('posts', this)">
           📋 Manage Posts
         </button>
+        <button id="adminsNav" onclick="showPage('admins', this)">
+          👥 Manage Admins
+        </button>
 
       </aside>
 
@@ -733,7 +736,18 @@
 
         </section>
 
-      </main>
+      <section id="adminsPage" class="hidden">
+<div class="page-title"><h1>Manage Admins</h1><p>Only the main admin can add or remove administrators.</p></div>
+<div class="content-card">
+<form id="adminForm">
+<label>Admin Name</label><input id="newAdminName" required>
+<label>Admin Email</label><input id="newAdminEmail" type="email" required>
+<label>Temporary Password</label><input id="newAdminPassword" type="password" minlength="8" required>
+<button class="btn btn-primary" type="submit">Create Admin</button>
+<p id="adminMessage" class="message"></p>
+</form></div>
+<div class="content-card"><h2>Authorized Administrators</h2><div id="adminList" class="post-list">Loading...</div></div>
+</section></main>
 
     </div>
 
@@ -748,62 +762,46 @@
       Change this after deploying server.js online.
     */
 
-    const API_URL = "ndima-kanini-academy-production.up.railway.app";
+    const API_URL = "https://ndima-kanini-academy-production-22a3.up.railway.app";
+    let authToken = localStorage.getItem("nk_admin_token") || "";
 
 
     let posts = [];
 
 
-    /* LOGIN - TEMPORARY */
+    /* SECURE LOGIN */
+    async function apiFetch(path, options = {}) {
+      const headers = options.headers || {};
+      if (authToken) headers.Authorization = `Bearer ${authToken}`;
+      return fetch(`${API_URL}${path}`, { ...options, headers });
+    }
 
-    document
-      .getElementById("loginForm")
-      .addEventListener("submit", function(event) {
-
-        event.preventDefault();
-
-        const email =
-          document.getElementById("adminEmail").value;
-
-        const password =
-          document.getElementById("adminPassword").value;
-
-
-        /*
-          Temporary login only.
-
-          Replace this with secure backend
-          authentication before deployment.
-        */
-
-        if (
-          email === "admin@ndimakanini.com" &&
-          password === "admin123"
-        ) {
-
-          document
-            .getElementById("loginPage")
-            .style.display = "none";
-
-          document
-            .getElementById("dashboard")
-            .style.display = "block";
-
-          loadPosts();
-
-        } else {
-
-          document
-            .getElementById("loginMessage")
-            .textContent =
-            "Incorrect email or password.";
-
-        }
-
-      });
-
+    document.getElementById("loginForm").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      const message = document.getElementById("loginMessage");
+      message.textContent = "Logging in...";
+      try {
+        const response = await fetch(`${API_URL}/api/auth/login`, {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            email: document.getElementById("adminEmail").value,
+            password: document.getElementById("adminPassword").value
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Login failed.");
+        authToken = data.token;
+        localStorage.setItem("nk_admin_token", authToken);
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        document.getElementById("adminsNav").style.display = data.user.role === "main_admin" ? "block" : "none";
+        loadPosts();
+      } catch (error) { message.textContent = error.message; }
+    });
 
     function logout() {
+      localStorage.removeItem("nk_admin_token");
+      authToken = "";
 
       document
         .getElementById("dashboard")
@@ -827,7 +825,7 @@
       try {
 
         const response =
-          await fetch(`${API_URL}/api/posts`);
+          await apiFetch(`/api/posts`);
 
         posts = await response.json();
 
@@ -857,7 +855,8 @@
         "vacancy",
         "news",
         "event",
-        "posts"
+        "posts",
+        "admins"
       ];
 
       pages.forEach(item => {
@@ -886,9 +885,8 @@
       button.classList.add("active");
 
 
-      if (page === "posts") {
-        loadPosts();
-      }
+      if (page === "posts") loadPosts();
+      if (page === "admins") loadAdmins();
 
     }
 
@@ -1217,8 +1215,8 @@
       try {
 
         const response =
-          await fetch(
-            `${API_URL}/api/posts/${id}`,
+          await apiFetch(
+            `/api/posts/${id}`,
             {
               method: "DELETE"
             }
@@ -1244,6 +1242,29 @@
 
     }
 
+
+    /* ADMIN MANAGEMENT */
+    async function loadAdmins() {
+      try {
+        const r = await apiFetch("/api/admins");
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message);
+        document.getElementById("adminList").innerHTML = data.map(a => `<div class="post-item"><div><h3>${escapeHTML(a.name)}</h3><p>${escapeHTML(a.email)} • ${a.role}</p></div><div class="post-actions">${a.role !== "main_admin" ? `<button class="delete-btn" onclick="deleteAdmin('${a.id}')">Remove</button>` : ""}</div></div>`).join("") || "<p>No administrators found.</p>";
+      } catch(e) { document.getElementById("adminList").textContent = e.message; }
+    }
+    document.getElementById("adminForm").addEventListener("submit", async function(e) {
+      e.preventDefault(); const msg=document.getElementById("adminMessage"); msg.textContent="Creating...";
+      try {
+        const r=await apiFetch("/api/admins",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:newAdminName.value,email:newAdminEmail.value,password:newAdminPassword.value})});
+        const d=await r.json(); if(!r.ok) throw new Error(d.message);
+        msg.textContent="Admin created successfully."; msg.className="message success"; e.target.reset(); loadAdmins();
+      } catch(err){msg.textContent=err.message;msg.className="message error";}
+    });
+    async function deleteAdmin(id) {
+      if(!confirm("Remove this administrator?")) return;
+      const r=await apiFetch(`/api/admins/${id}`,{method:"DELETE"}); const d=await r.json();
+      if(!r.ok) return alert(d.message||"Could not remove admin."); loadAdmins();
+    }
 
     /* BASIC HTML ESCAPING */
 
